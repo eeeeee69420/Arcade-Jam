@@ -90,6 +90,7 @@ public class GameState : MonoBehaviour
                 break;
             }
             case GameStateEnum.GameOver:
+            break; 
             default:
                 throw new ArgumentOutOfRangeException();
         }
