@@ -1,32 +1,67 @@
 using UnityEngine;
 
-public class PlayerMovement : MonoBehaviour {
+public class PlayerMovement : MonoBehaviour
+{
 
-    // Movement speed modifier for the player
     public float speed = 5;
-    
-    // Reference to the 2D Rigidbody component for physics-based movement
+
     private Rigidbody2D _rigidbody2D;
-    
-    // Reference to the player actions script to determine player index/ID
+
     private PlayerActions _playerActions;
-    
-    // Start is called before the first frame update
-    private void Start() {
-        // Cache the Rigidbody2D and PlayerActions components attached to this GameObject
+
+    private PlayerAnimator _playerAnimator;
+    private SpriteRenderer _spriteRenderer;
+    private PlayerJump _playerJump;
+    public bool canMove = true;
+    private float horizontal;
+
+    private void Start()
+    {
         _rigidbody2D = GetComponent<Rigidbody2D>();
         _playerActions = GetComponent<PlayerActions>();
+        _playerAnimator = GetComponent<PlayerAnimator>();
+        _spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        _playerJump = GetComponent<PlayerJump>();
     }
 
-    // Update is called once per frame
-    private void Update() {
-        // Only allow movement if the game is currently in a match
+    private void Update()
+    {
         if (GameState.Instance.gameState != GameState.GameStateEnum.InMatch) return;
-        
-        // Get horizontal input value (-1, 0, or 1) using the player's specific control axis
-        float horizontal = Input.GetAxisRaw(GameState.Instance.horizontalAxis + _playerActions.playerCount);
-            
-        // Apply horizontal velocity while preserving the current vertical velocity
-        _rigidbody2D.velocity = new Vector2(horizontal * speed, _rigidbody2D.velocity.y);
+        if (_playerJump.groundCheck)
+        {
+            horizontal = 0f;
+            if (canMove)
+            {
+                horizontal = Input.GetAxisRaw(GameState.Instance.horizontalAxis + _playerActions.playerCount);
+            }
+        }
+        else
+        {
+            if (canMove)
+            {
+                horizontal = Input.GetAxisRaw(GameState.Instance.horizontalAxis + _playerActions.playerCount) / 1.3f;
+            }
+        }
+
+            bool isMoving = Mathf.Abs(horizontal) > 0.04f;
+        if (isMoving)
+        {
+            if (_playerActions.playerCount == "1")
+            {
+                if (horizontal > 0)
+                    _spriteRenderer.flipX = false;
+                else if (horizontal < 0)
+                    _spriteRenderer.flipX = true;
+            }
+            else
+            {
+                if (horizontal > 0)
+                    _spriteRenderer.flipX = true;
+                else if (horizontal < 0)
+                    _spriteRenderer.flipX = false;
+            }
+        }
+        _playerAnimator.animator.SetBool("IsMoving", isMoving);
+        _rigidbody2D.linearVelocity = new Vector2(horizontal * speed, _rigidbody2D.linearVelocity.y);
     }
 }

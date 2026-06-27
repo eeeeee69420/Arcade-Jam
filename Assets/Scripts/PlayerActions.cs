@@ -4,148 +4,222 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.Serialization;
+using static TMPro.SpriteAssetUtilities.TexturePacker_JsonArray;
+using static UnityEngine.EventSystems.EventTrigger;
 
-public class PlayerActions : MonoBehaviour {
-    // Identifier string for the player (e.g., "1", "2") to map multiplayer inputs
+public class PlayerActions : MonoBehaviour
+{
     public string playerCount = "1";
-    
-    // Stores the initial spawn position of the player
-    private Vector3 _start;
-    
-    // Reference to the 2D Rigidbody component for resetting velocity on respawn
-    private Rigidbody2D _rigidbody;
-    
-    // Reference to the PlayerWeapon component to fetch aiming direction and spawn point
-    private PlayerWeapon _playerWeapon;
-    
-    // The bullet/projectile prefab to instantiate when shooting
+
+    public Vector3 _start;
+
+    public Rigidbody2D _rigidbody;
+
+
     public GameObject xObject;
-    
-    // Custom color applied to the spawned projectile's sprite
-    public Color bulletColor; 
-    
-    // Physics layers that the spawned projectile should ignore
-    public LayerMask layersToExclude;
-    
-    // Cooldown duration between weapon shots
-    public float spawnInterval = 2f;
-    
-    // Tracks the remaining cooldown time before the player can shoot again
+
+    public Color bulletColor;
+
+    public float spawnInterval = 1.5f;
+
     public float currentTime = 0f;
-    
-    // Flag checking if the weapon is off cooldown and ready to fire
-    private bool _canShoot = true;
-    
-    // Start is called before the first frame update
+
+    public bool _canUse = true;
+
+    public Transform spawnPoint;
+
+    public PlayerAnimator _playerAnimator;
+    public PlayerJump _playerJump;
+    public PlayerMovement _playerMovement;
+    public LayerMask enemyLayer;
+    public SpriteRenderer _spriteRenderer;
+
+    [SerializeField] private MoveData AttackSideData;
+    [SerializeField] private MoveData AttackUpData;
+    [SerializeField] private MoveData AttackDownData;
+    [SerializeField] private MoveData BlockData;
+    public MoveData HurtData;
+
+    public float hp = 100f;
+    public float hpMax = 100f;
+    public bool invincible = false;
+
     private void Start()
     {
-        // Record the initial starting position for respawning purposes
         _start = gameObject.transform.position;
-        
-        // Cache the Rigidbody2D and PlayerWeapon components attached to this GameObject
         _rigidbody = GetComponent<Rigidbody2D>();
-        _playerWeapon = GetComponent<PlayerWeapon>();
+        _playerAnimator = GetComponent<PlayerAnimator>();
+        _playerJump = GetComponent<PlayerJump>();
+        _playerMovement = GetComponent<PlayerMovement>();
+        _spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        hp = hpMax;
     }
 
-    // Update is called once per frame
-    private void Update() {
-        // Execute input logic based on the current state of the game manager
-        switch (GameState.Instance.gameState) {
-            
-            // Handles input during the pre-match preparation phase
-            case GameState.GameStateEnum.GetReady: {
-                // If the player presses their designated jump button, set their ready status
-                if (Input.GetButtonDown(GameState.Instance.jumpButton + playerCount)) {
-                    GameState.Instance.SetReady(playerCount);
-                }
-                break;
-            }
-            
-            // Handles input during an active gameplay match
-            case GameState.GameStateEnum.InMatch: {
-                
-                // Primary action button (X Button) to handle weapon shooting
-                if (Input.GetButtonDown(GameState.Instance.actionX + playerCount)) {
-                    // Prevent shooting if the weapon is still cooling down
-                    if (!_canShoot) return;
-                    
-                    // Reset the cooldown timer and lock shooting
-                    currentTime = spawnInterval;
-                    _canShoot = false;
-                    
-                    // Locate the weapon position to use as the spawn point location
-                    Transform spawnPoint = _playerWeapon.weapon.transform;
-                    
-                    // Instantiate the projectile at the weapon's position and rotation
-                    GameObject newObject = Instantiate(xObject, spawnPoint.position, spawnPoint.rotation);
-                    
-                    // Color the projectile's child sprite component to match the designated player color
-                    newObject.transform.Find("Sprite").GetComponent<SpriteRenderer>().color = bulletColor;
-                    
-                    // Configure the projectile's 2D Rigidbody layer exclusions
-                    newObject.GetComponent<Rigidbody2D>().excludeLayers = layersToExclude;
-                    
-                    // Pass the current aiming direction from the PlayerWeapon script to the projectile
-                    newObject.GetComponent<BulletController>().SetDirection(_playerWeapon.direction);
-                }
+    public virtual void Update()
+    {
+        switch (GameState.Instance.gameState)
+        {
 
-                // Debug tracking for secondary interaction buttons (B, Y, RB, LB)
-                if (Input.GetButtonDown(GameState.Instance.actionB + playerCount)) {
-                    Debug.Log(GameState.Instance.actionB + playerCount + " B button Pressed");
-                }
-
-                if (Input.GetButtonDown(GameState.Instance.actionY + playerCount)) {
-                    Debug.Log(GameState.Instance.actionY + playerCount + " Y button Pressed");
-                }
-
-                if (Input.GetButtonDown(GameState.Instance.actionRB + playerCount)) {
-                    Debug.Log(GameState.Instance.actionRB + playerCount + " Right Bumper button Pressed");
-                }
-
-                if (Input.GetButtonDown(GameState.Instance.actionLB + playerCount)) {
-                    Debug.Log(GameState.Instance.actionLB + playerCount + " Left Bumper button Pressed");
-                }
-
-                // Process active weapon cooldown timer
-                if (!_canShoot) {
-                    currentTime -= Time.deltaTime;
-                    // Unlock weapon shooting once the timer expires
-                    if (currentTime < 0) {
-                        _canShoot = true;
+            case GameState.GameStateEnum.GetReady:
+                {
+                    if (Input.GetButtonDown(GameState.Instance.jumpButton + playerCount))
+                    {
+                        GameState.Instance.SetReady(playerCount);
                     }
+                    break;
                 }
-                break;
-            }
-            
-            // Handles input when the match concludes
-            case GameState.GameStateEnum.GameOver: {
-                // Restart the current scene if the player presses their jump button
-                if (Input.GetButtonDown(GameState.Instance.jumpButton + playerCount)) {
-                    SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+
+            case GameState.GameStateEnum.InMatch:
+                {
+                    if (!_canUse)
+                        return;
+                    if (Input.GetButtonDown(GameState.Instance.actionX + playerCount))
+                    {
+                        _playerAnimator.PlayAnimation("KnightAttackDown");
+                        StartCoroutine(AnimationSequence(AttackDownData));
+                    }
+
+                    if (Input.GetButtonDown(GameState.Instance.actionB + playerCount))
+                    {
+                        _playerAnimator.PlayAnimation("KnightAttackUp");
+                        StartCoroutine(AnimationSequence(AttackUpData));
+                    }
+
+                    if (Input.GetButtonDown(GameState.Instance.actionY + playerCount))
+                    {
+                        _playerAnimator.PlayAnimation("KnightAttackStraight");
+                        StartCoroutine(AnimationSequence(AttackSideData));
+                    }
+                    if (Input.GetButtonDown(GameState.Instance.actionLB + playerCount) || Input.GetButtonDown(GameState.Instance.actionRB + playerCount))
+                    {
+                        _playerAnimator.PlayAnimation("KnightBlock");
+                        StartCoroutine(AnimationSequence(BlockData));
+                    }
+
+                    break;
                 }
-                break;
-            }
+
+            case GameState.GameStateEnum.GameOver:
+                {
+                    if (Input.GetButtonDown(GameState.Instance.jumpButton + playerCount))
+                    {
+                        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                    }
+                    break;
+                }
             default:
                 throw new ArgumentOutOfRangeException();
         }
     }
-    
-    // Triggered when the player enters a 2D trigger zone
-    private void OnTriggerEnter2D(Collider2D collision) { 
-        // Route behavior depending on the tag of the overlapping object
-        switch (collision.tag) {
-            // Handles player death hazards
-            case "Death": {
-                // Reset player position back to the recorded starting coordinates
-                transform.position = _start;
-                
-                // Kill any residual physical movement momentum instantly
-                _rigidbody.velocity = Vector2.zero;
-                
-                // Report the death to the global game state to decrease health/lives
-                GameState.Instance.TakeDamage(playerCount);
-                break;
+
+    public virtual IEnumerator AnimationSequence(MoveData moveData)
+    {
+        _canUse = false;
+        if (moveData.freezeMovement)
+        {
+            _playerJump.canMove = false;
+            _playerMovement.canMove = false;
+        }
+        if (moveData.isInvincible)
+        {
+            invincible = true;
+        }
+        foreach (var moveFrame in moveData.moveFrames)
+        {
+            for (int i = 0; i < 30; i++)
+                yield return new WaitForEndOfFrame();
+            RunFrame(moveFrame);
+        }
+        if (moveData.freezeMovement)
+        {
+            _playerJump.canMove = true;
+            _playerMovement.canMove = true;
+        }
+        if (moveData.isInvincible)
+        {
+            invincible = false;
+        }
+        yield return new WaitForSeconds(.2f);
+        _canUse = true;
+
+    }
+    public virtual void RunFrame(MoveFrame moveFrame)
+    {
+        if (moveFrame.moveHitbox != null)
+        {
+            Collider2D enemyHit = Hitbox(moveFrame.moveHitbox);
+            if (enemyHit != null)
+            {
+                PlayerActions enemy = enemyHit.GetComponent<PlayerActions>();
+                if (!enemy.invincible)
+                {
+                    enemy.TakeDamage(moveFrame.moveHitbox.damage);
+                }
             }
         }
+    }
+    public virtual void TakeDamage(float damage)
+    {
+        StopAllCoroutines();
+        _playerAnimator.PlayAnimation("KnightHurt");
+        StartCoroutine(AnimationSequence(HurtData));
+        hp -= damage;
+        GameState.Instance.TakeDamage(playerCount, hp);
+        if (hp <= 0)
+        {
+            _playerAnimator.PlayAnimation("KnightDeath");
+            invincible = true;
+            _playerJump.canMove = false;
+            _playerMovement.canMove = false;
+            _canUse = false;
+        }
+    }
+    public Vector2 _gizmoPosition;
+    public Vector2 _gizmoSize;
+    public bool _drawGizmo;
+    public bool _gizmoHit;
+
+    public virtual Collider2D Hitbox(MoveHitbox moveHitbox)
+    {
+        Vector2 position = (Vector2)transform.position + new Vector2(
+            _spriteRenderer.flipX ? -moveHitbox.hitboxOffset.x : moveHitbox.hitboxOffset.x,
+            moveHitbox.hitboxOffset.y
+        );
+
+        Collider2D hit = Physics2D.OverlapBox(position, moveHitbox.hitboxSize, 0f, enemyLayer);
+
+        _gizmoPosition = position;
+        _gizmoSize = moveHitbox.hitboxSize;
+        _gizmoHit = hit;
+        _drawGizmo = true;
+        Debug.Log(hit);
+        return hit;
+    }
+
+    public virtual void OnDrawGizmos()
+    {
+        if (!_drawGizmo) return;
+        Gizmos.color = _gizmoHit ? Color.red : Color.green;
+        Gizmos.DrawWireCube(_gizmoPosition, _gizmoSize);
+    }
+
+    [System.Serializable]
+    public class MoveData
+    {
+        public bool freezeMovement;
+        public bool isInvincible;
+        public List<MoveFrame> moveFrames = new();
+    }
+    [System.Serializable]
+    public class MoveFrame
+    {
+        public MoveHitbox moveHitbox;
+    }
+    [System.Serializable]
+    public class MoveHitbox
+    {
+        public Vector2 hitboxOffset;
+        public Vector2 hitboxSize;
+        public float damage;
     }
 }
