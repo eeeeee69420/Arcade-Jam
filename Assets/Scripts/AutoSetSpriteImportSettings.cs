@@ -1,4 +1,4 @@
-using UnityEngine;
+/*using UnityEngine;
 using UnityEditor;
 
 public class AutoSetSpriteImportSettings : AssetPostprocessor
@@ -15,4 +15,4 @@ public class AutoSetSpriteImportSettings : AssetPostprocessor
             importer.spritePixelsPerUnit = 32;
         }
     }
-}
+}*/
